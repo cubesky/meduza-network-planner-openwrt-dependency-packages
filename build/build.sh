@@ -80,6 +80,9 @@ else
     --disable-nhrpd --disable-vtysh --disable-werror
   make -j"$jobs" lib/clippy
   cd /build/frr
+  # AC_CHECK_LIB(lyd_find_xpath3) uses global LIBS, not LIBYANG_LIBS.
+  # Include libyang's private dependencies so static probes and daemon links work.
+  frr_libs="$(pkg-config --static --libs libyang readline) -lm -ldl -pthread -latomic"
   # FRR requires shared-library generation even when its installed daemons are fully static.
   PYTHON=python3 ./configure --prefix=/usr --sbindir=/usr/sbin --libdir=/usr/lib \
     --with-clippy=/build/clippy/lib/clippy \
@@ -88,7 +91,7 @@ else
     --enable-user=root --enable-group=root --enable-vty-group=root \
     --disable-doc --disable-backtrace --disable-snmp --disable-rpki --disable-werror \
     --disable-sysrepo --disable-grpc --disable-zeromq --disable-fpm \
-    LIBS="$(pkg-config --static --libs readline) -latomic"
+    LIBS="$frr_libs" || { cat config.log >&2; exit 1; }
   make -j"$jobs"
   make DESTDIR=/stage install
   for bin in babeld bfdd bgpd eigrpd fabricd isisd ldpd nhrpd ospfd ospf6d pathd pbrd \
