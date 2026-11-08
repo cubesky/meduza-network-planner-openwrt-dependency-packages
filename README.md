@@ -1,81 +1,48 @@
-# OpenWrt tinc / FRR 自动编译
+# Meduza NP OpenWrt dependency packages
 
-GitHub Actions 使用官方发行版 SDK 从源码编译 tinc 和 FRR。两者在独立任务中构建，按软件、架构和格式分别输出；FRR 保留官方独立子包，包括 BGP、OSPF、Zebra、watchfrr 等。
+tinc 和 FRR 分开编译，为 [meduza-network-planner-v2](https://github.com/cubesky/meduza-network-planner-v2) 提供可安装的原生 OpenWrt 包。
 
-## 触发与下载
+## 与主项目同步的构建方式
 
-- 推送任意 TAG：完整构建全部 36 个组合，全部成功后自动将 36 份归档与 `SHA256SUMS` 上传到该 TAG 的 GitHub Release。
-- 手动触发：在 **Actions → Build tinc and FRR packages → Run workflow** 中选择软件、格式和架构。在运行页面的 **Artifacts** 下载对应归档；手动运行不会修改 Release。
-- 手动入口要求本工作流已提交到仓库的默认分支。TAG 需要指向包含本工作流的提交。
+同步基准为主项目提交 `7b3a4a9ecc551e537c4325ed08a4f00409bc5a4a` 的 `tools/release/src/openwrt.rs`、`tools/openwrt-apk.sh` 及 provider 构建流程：
 
-```sh
-git tag v1.0.0
-git push origin v1.0.0
-```
+- 使用同一个固定 digest 的 Alpine 3.24 镜像，通过 Podman / QEMU 在目标平台编译完整静态 musl 二进制。
+- 按同一个 musl 目标到 OpenWrt 架构的映射，一次编译生成多个原生包。完整构建共 6 个任务：2 个软件 × 3 个平台。
+- ipk 使用带 `./` 路径的 gzip/tar 外层与 `debian-binary`、`data.tar.gz`、`control.tar.gz`。
+- apk 使用同一个固定镜像的 `apk mkpkg` 生成 APK v3 / ADB 格式；打包容器禁用网络。
+- 两种格式均命名为 `<package>_<version>_<arch>.ipk|apk`，每个文件附带主项目同结构的 `.json` 产物描述，包括 `openwrt/<arch>`、大小和 SHA256。
 
-TAG 是本仓库的发布标识；tinc / FRR 的实际版本由对应发行版的官方 packages feed 决定，不会把 TAG 强行写入软件版本。packages feed 固定到官方 `feeds.buildinfo` 中的 commit；基础依赖的 base feed 固定到 SDK 自带的 commit。两者都记录在每份归档的 `build-info.json`。
+构建不再下载 OpenWrt SDK；tinc、FRR 及其依赖静态链接。源码与校验值记录在 `ci/sources.lock.json`，每次下载均校验；损坏或截断的响应会自动重试，最多 4 次。
 
-## 格式和架构
-
-| 格式 | 固定 SDK 发行版 |
-| --- | --- |
-| ipk | OpenWrt 24.10.8 |
-| apk | OpenWrt 25.12.6 |
-
-| 名称 / 可输入别名 | 实际包架构 | SDK target/subtarget |
+| musl 编译目标 | 构建平台 / 别名 | 输出 OpenWrt 架构 |
 | --- | --- | --- |
-| x86、i386 | i386_pentium4 | x86/generic |
-| x64、amd64、linux-amd64 | x86_64 | x86/64 |
-| aarch64_cortex-a53 | aarch64_cortex-a53 | bcm27xx/bcm2710 |
-| aarch64_cortex-a72 | aarch64_cortex-a72 | bcm27xx/bcm2711 |
-| aarch64_cortex-a76 | aarch64_cortex-a76 | bcm27xx/bcm2712 |
-| arm64、aarch64、aarch64_generic | aarch64_generic | armsr/armv8 |
-| arm-v7、armv7、arm_cortex-a7 | arm_cortex-a7_neon-vfpv4 | sunxi/cortexa7 |
-| arm_cortex-a15 | arm_cortex-a15_neon-vfpv4 | ipq806x/generic |
-| arm_cortex-a9_vfpv3 | arm_cortex-a9_vfpv3-d16 | mvebu/cortexa9 |
+| x86_64-unknown-linux-musl | linux/amd64、linux-amd64、x64 | x86_64 |
+| aarch64-unknown-linux-musl | linux/arm64、arm64 | aarch64_generic、aarch64_cortex-a53、aarch64_cortex-a72、aarch64_cortex-a76 |
+| armv7-unknown-linux-musleabihf | linux/arm/v7、arm-v7 | arm_cortex-a7_neon-vfpv4、arm_cortex-a9_vfpv3-d16、arm_cortex-a15_neon-vfpv4 |
 
-`architectures` 输入 `all` 构建全部架构，也可输入逗号分隔的实际架构或别名，例如 `x64,arm64,arm-v7`。重复的别名会自动去重，未知架构会报错。
+平台别名会选择该平台的全部 OpenWrt 架构；输入单个实际架构则只打包该架构。ARMv7 统一采用 VFPv3-D16 hard-float，适用于表中三种架构。与主项目一致，仅提供以上 8 种架构，未提供 32 位 x86 / MIPS / 无 FPU ARM。
 
-`linux-amd64`、`arm-v7`、`arm64` 在这里作为 OpenWrt 架构别名处理。产物是基于 musl 的 OpenWrt 安装包；不能作为通用 Linux 静态二进制使用。特别是 ARMv7 必须匹配设备的 CPU / FPU 架构。x86 选择的是官方 `i386_pentium4`，不是所有旧式 32 位 CPU。
+## 触发和下载
 
-构建所用的 target/subtarget 提供相应用户态架构的工具链，不表示包仅能装到该 target 的设备。实际安装还需匹配固件的发行版、架构与 ABI；TUN 等内核模块从设备自己的软件源安装。
+推送任意 TAG 构建全部目标，所有任务及验收通过后，原生 `.ipk`、`.apk`、对应 `.json` 和 `SHA256SUMS` 直接发布到该 TAG 的 Release。TAG 表示本仓库发布版本；软件版本由源码锁文件决定。
 
-## 归档内容与安装
+手动运行 **Actions → Build tinc and FRR packages → Run workflow**，可选择 `package`、`format`、`architectures`，例如 `aarch64_generic` 或 `x64,arm64,arm-v7`。手动运行从 Artifacts 下载，不修改 Release。手动入口需要工作流已进入默认分支。
 
-归档名示例：`frr-openwrt-25.12.6-aarch64_cortex-a53-apk.tar.gz`。
+## tinc / FRR 分包和验证
 
-```text
-packages/          tinc 或 FRR 的原生 .ipk / .apk 文件
-dependencies/      本次编译生成的非内核依赖包
-build-info.json    发行版、架构、SDK 校验值、feed commit、文件校验值
-sdk.config         实际 SDK 构建配置
-package.Makefile   实际编译使用的包配方
-SHA256SUMS         归档内文件的 SHA256 校验值
-INSTALL.md         安装与依赖说明
-```
+tinc 包提供 `/usr/sbin/tinc`、`/usr/sbin/tincd`。FRR 分为主包 `frr` 与 22 个二进制子包，包括 `frr-zebra`、`frr-mgmtd`、`frr-vtysh`、`frr-bgpd`、`frr-bfdd`、`frr-ospfd` 等；子包依赖相同版本的主包。所有进程由 Meduza NP 管理，附带的独立 procd 服务默认不启用。
 
-安装步骤见 [INSTALL.md](INSTALL.md)。FRR 子包可按需安装，tinc 与 FRR 不会放在同一份归档中。应用与依赖均保留原生文件名。
+每个平台先检查 ELF 架构、无解释器、无动态依赖，再原生或经 QEMU 运行二进制。tinc 额外测试 RSA / Ed25519 密钥生成。x86_64 的两种包格式还在与主项目相同版本的真实 OpenWrt userspace 容器中执行安装、运行和卸载。安装说明见 [INSTALL.md](INSTALL.md)。这些检查由 GitHub CI 执行；辅助脚本测试可在 Windows 本地执行。
 
-## 维护与验证
-
-- 在 `ci/targets.json` 中更新 SDK 发行版或增加架构；格式必须使用支持该格式的 SDK。
-- 准备阶段先运行本地测试，并核对选中组合的官方 SDK 清单、文件校验值与 `profiles.json` 中的实际架构，再启动编译。
-- SDK、架构信息和 feed 信息均通过官方 HTTPS 下载；SDK 和元数据按官方 `sha256sums` 验证。
-- 使用 GitHub 自带的 `GITHUB_TOKEN`；只有 Release 任务有 `contents: write` 权限，无需额外 Token。仓库或组织策略需允许工作流创建 Release。
-- 构建并发上限为 6，每个任务最多使用 2 个编译进程，编译失败会自动以单进程重试。失败日志保留 7 天，成功 Artifacts 保留 30 天，Release 资产长期保留。
-
-本地运行不依赖第三方 Python 模块的测试：
+## 维护
 
 ```sh
 python -m unittest discover -s tests -v
+python ci/sync_upstream.py
+# 显式同步主项目最新架构和打包镜像，并检查差异后提交：
+python ci/sync_upstream.py --ref master --write
 ```
 
-联网检查全部 SDK 的可用性（不下载大型 SDK 归档）：
+CI 会验证固定提交中的架构表、格式与 APK 构建镜像。`--write` 更新固定提交、源码摘要和架构映射，构建配方读取同一镜像值；新增 musl 编译目标会要求补齐对应编译和验收配置。
 
-```sh
-python ci/check_sdks.py
-```
-
-构建本身需要 Linux x86_64 环境及工作流中列出的依赖。Windows 可运行辅助脚本测试，交叉编译在 GitHub 的 Ubuntu runner 中执行。
-
-官方参考：[OpenWrt 发行版](https://downloads.openwrt.org/releases/)、[tinc 包配方](https://github.com/openwrt/packages/tree/openwrt-25.12/net/tinc)、[FRR 包配方](https://github.com/openwrt/packages/tree/openwrt-25.12/net/frr)。
+工作流使用 GitHub 自带的 Token，只有发布任务拥有 `contents: write`。成功 Artifacts 保留 30 天，失败日志保留 7 天。构建需要 Linux x86_64 runner、Podman、QEMU 与 binutils。

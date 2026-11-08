@@ -1,0 +1,12 @@
+{
+  "packages": {"tinc": {"version": "1.1_pre18-r1", "sources": ["tinc", "lzo"]}, "frr": {"version": "10.4.1-r1", "sources": ["frr", "libyang", "json-c", "c-ares", "protobuf-c"]}},
+  "sources": [
+    {"name": "tinc", "version": "1.1pre18", "url": "https://tinc-vpn.org/packages/tinc-1.1pre18.tar.gz", "sha256": "2757ddc62cf64b411f569db2fa85c25ec846c0db110023f6befb33691f078986", "license": "GPL-2.0-or-later", "license_file": "COPYING"},
+    {"name": "lzo", "version": "2.10", "url": "https://sources.openwrt.org/lzo-2.10.tar.gz", "sha256": "c0f892943208266f9b6543b3ae308fab6284c5c90e627931446fb49b4221a072", "license": "GPL-2.0-or-later", "license_file": "COPYING"},
+    {"name": "frr", "version": "10.4.1", "url": "https://codeload.github.com/FRRouting/frr/tar.gz/frr-10.4.1", "sha256": "8e4003eaba168626c5ea7a6735f2c85c87b04214e6f8c8f2715b21f8ae40970b", "license": "GPL-2.0-or-later AND LGPL-2.1-or-later", "license_file": "COPYING"},
+    {"name": "libyang", "version": "3.13.6", "url": "https://codeload.github.com/CESNET/libyang/tar.gz/v3.13.6", "sha256": "5cd5018f39c830f97d70616c003990287ce5e820ae2792763a49e2a1f63af8d6", "license": "BSD-3-Clause", "license_file": "LICENSE"},
+    {"name": "json-c", "version": "0.18", "url": "https://codeload.github.com/json-c/json-c/tar.gz/json-c-0.18-20240915", "sha256": "3112c1f25d39eca661fe3fc663431e130cc6e2f900c081738317fba49d29e298", "license": "MIT", "license_file": "COPYING"},
+    {"name": "c-ares", "version": "1.34.5", "url": "https://codeload.github.com/c-ares/c-ares/tar.gz/v1.34.5", "sha256": "dcd919635f01b7c8c9c2f5fb38063cd86500f7c6d4d32ecf4deff5e3497fb157", "license": "MIT", "license_file": "LICENSE.md"},
+    {"name": "protobuf-c", "version": "1.5.2", "url": "https://codeload.github.com/protobuf-c/protobuf-c/tar.gz/v1.5.2", "sha256": "cea46eeaa19c52924938b582c5d128a6ed3b6fb5b3f4677476a1781cc06e03f3", "license": "BSD-2-Clause", "license_file": "LICENSE"}
+  ]
+}

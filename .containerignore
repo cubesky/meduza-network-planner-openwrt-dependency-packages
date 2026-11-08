@@ -1,0 +1,8 @@
+.git
+.tools
+__pycache__
+**/__pycache__
+out
+dist
+output
+build.log

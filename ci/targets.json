@@ -1,17 +1,17 @@
 {
-  "releases": {
-    "ipk": "24.10.8",
-    "apk": "25.12.6"
+  "upstream": {
+    "repository": "cubesky/meduza-network-planner-v2",
+    "revision": "7b3a4a9ecc551e537c4325ed08a4f00409bc5a4a",
+    "layout_sha256": "fe312bdaa24cfa202704a338acba9138d859cd33464abeafe8735aac2cd986d6",
+    "apk_script_sha256": "b7525171390fac07120575d55438601c1f84c7c1a00d5f909e4b010af800627e"
   },
-  "architectures": [
-    {"arch": "i386_pentium4", "target": "x86/generic", "aliases": ["x86", "i386"]},
-    {"arch": "x86_64", "target": "x86/64", "aliases": ["x64", "amd64", "linux-amd64"]},
-    {"arch": "aarch64_cortex-a53", "target": "bcm27xx/bcm2710", "aliases": []},
-    {"arch": "aarch64_cortex-a72", "target": "bcm27xx/bcm2711", "aliases": []},
-    {"arch": "aarch64_cortex-a76", "target": "bcm27xx/bcm2712", "aliases": []},
-    {"arch": "aarch64_generic", "target": "armsr/armv8", "aliases": ["arm64", "aarch64"]},
-    {"arch": "arm_cortex-a7_neon-vfpv4", "target": "sunxi/cortexa7", "aliases": ["arm_cortex-a7", "arm-v7", "armv7"]},
-    {"arch": "arm_cortex-a15_neon-vfpv4", "target": "ipq806x/generic", "aliases": ["arm_cortex-a15"]},
-    {"arch": "arm_cortex-a9_vfpv3-d16", "target": "mvebu/cortexa9", "aliases": ["arm_cortex-a9_vfpv3"]}
-  ]
+  "builder_image": "docker.io/library/alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a",
+  "formats": ["ipk", "apk"],
+  "targets": [
+    {"target": "x86_64-unknown-linux-musl", "platform": "linux/amd64", "machine": "Advanced Micro Devices X86-64", "qemu": "", "arches": ["x86_64"], "aliases": ["x64", "amd64", "linux-amd64"]},
+    {"target": "aarch64-unknown-linux-musl", "platform": "linux/arm64", "machine": "AArch64", "qemu": "qemu-aarch64-static", "arches": ["aarch64_generic", "aarch64_cortex-a53", "aarch64_cortex-a72", "aarch64_cortex-a76"], "aliases": ["arm64", "aarch64", "linux-arm64"]},
+    {"target": "armv7-unknown-linux-musleabihf", "platform": "linux/arm/v7", "machine": "ARM", "qemu": "qemu-arm-static", "arches": ["arm_cortex-a7_neon-vfpv4", "arm_cortex-a9_vfpv3-d16", "arm_cortex-a15_neon-vfpv4"], "aliases": ["arm-v7", "armv7", "linux-arm-v7"]}
+  ],
+  "architecture_aliases": {"arm_cortex-a7": "arm_cortex-a7_neon-vfpv4", "arm_cortex-a9_vfpv3": "arm_cortex-a9_vfpv3-d16", "arm_cortex-a15": "arm_cortex-a15_neon-vfpv4"},
+  "acceptance_images": {"ipk": "docker.io/openwrt/rootfs:x86_64-v24.10.8", "apk": "docker.io/openwrt/rootfs:x86-64-25.12.6"}
 }

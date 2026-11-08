@@ -1,0 +1,18 @@
+ARG BUILDER_IMAGE
+FROM ${BUILDER_IMAGE} AS build
+ARG PACKAGE
+ARG TARGETPLATFORM
+ARG BUILD_JOBS=2
+RUN apk add --no-cache build-base linux-headers perl autoconf automake libtool pkgconf \
+    git python3 python3-dev py3-pytest py3-setuptools elfutils-dev bison flex cmake samurai jq binutils patch \
+    openssl-dev openssl-libs-static zlib-dev zlib-static pcre2-dev pcre2-static \
+    readline-dev readline-static ncurses-dev ncurses-static libcap-dev libcap-static \
+    protobuf-c-compiler
+COPY ci/sources.lock.json /recipe/lock.json
+COPY downloads/ /archives/
+COPY build/build.sh /recipe/build.sh
+RUN PACKAGE="$PACKAGE" TARGETPLATFORM="$TARGETPLATFORM" BUILD_JOBS="$BUILD_JOBS" \
+    sh /recipe/build.sh /recipe/lock.json /out
+
+FROM scratch
+COPY --from=build /out/ /
