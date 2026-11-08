@@ -1,0 +1,17 @@
+{
+  "releases": {
+    "ipk": "24.10.8",
+    "apk": "25.12.6"
+  },
+  "architectures": [
+    {"arch": "i386_pentium4", "target": "x86/generic", "aliases": ["x86", "i386"]},
+    {"arch": "x86_64", "target": "x86/64", "aliases": ["x64", "amd64", "linux-amd64"]},
+    {"arch": "aarch64_cortex-a53", "target": "bcm27xx/bcm2710", "aliases": []},
+    {"arch": "aarch64_cortex-a72", "target": "bcm27xx/bcm2711", "aliases": []},
+    {"arch": "aarch64_cortex-a76", "target": "bcm27xx/bcm2712", "aliases": []},
+    {"arch": "aarch64_generic", "target": "armsr/armv8", "aliases": ["arm64", "aarch64"]},
+    {"arch": "arm_cortex-a7_neon-vfpv4", "target": "sunxi/cortexa7", "aliases": ["arm_cortex-a7", "arm-v7", "armv7"]},
+    {"arch": "arm_cortex-a15_neon-vfpv4", "target": "ipq806x/generic", "aliases": ["arm_cortex-a15"]},
+    {"arch": "arm_cortex-a9_vfpv3-d16", "target": "mvebu/cortexa9", "aliases": ["arm_cortex-a9_vfpv3"]}
+  ]
+}

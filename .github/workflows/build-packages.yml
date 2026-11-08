@@ -1,0 +1,158 @@
+name: Build tinc and FRR packages
+
+on:
+  push:
+    tags:
+      - '**'
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package to build
+        type: choice
+        default: all
+        options: [all, tinc, frr]
+      format:
+        description: Package format (ipk = OpenWrt 24.10, apk = OpenWrt 25.12)
+        type: choice
+        default: all
+        options: [all, ipk, apk]
+      architectures:
+        description: 'all or comma-separated architectures/aliases, e.g. x64,arm64,arm-v7'
+        type: string
+        default: all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packages-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check build helpers
+        run: python3 -m unittest discover -s tests -v
+      - name: Generate build matrix
+        id: matrix
+        env:
+          INPUT_PACKAGE: ${{ inputs.package }}
+          INPUT_FORMAT: ${{ inputs.format }}
+          INPUT_ARCHITECTURES: ${{ inputs.architectures }}
+        run: python3 ci/matrix.py
+      - name: Verify SDK availability and architecture
+        env:
+          INPUT_FORMAT: ${{ inputs.format }}
+          INPUT_ARCHITECTURES: ${{ inputs.architectures }}
+        run: python3 ci/check_sdks.py
+
+  build:
+    needs: prepare
+    name: ${{ matrix.package }} / ${{ matrix.format }} / ${{ matrix.arch }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install SDK build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
+            gettext git libelf-dev libncurses-dev libssl-dev python3 python3-setuptools \
+            rsync swig unzip zlib1g-dev file wget curl ca-certificates xz-utils zstd \
+            pkgconf patch perl tar
+      - name: Restore source downloads
+        uses: actions/cache@v4
+        with:
+          path: downloads
+          key: sources-${{ runner.os }}-${{ matrix.release }}-${{ matrix.package }}-${{ matrix.arch }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            sources-${{ runner.os }}-${{ matrix.release }}-${{ matrix.package }}-${{ matrix.arch }}-
+            sources-${{ runner.os }}-${{ matrix.release }}-${{ matrix.package }}-
+      - name: Compile and package
+        env:
+          PACKAGE: ${{ matrix.package }}
+          FORMAT: ${{ matrix.format }}
+          RELEASE: ${{ matrix.release }}
+          TARGET: ${{ matrix.target }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -o pipefail
+          python3 -u ci/build.py \
+            --package "$PACKAGE" --format "$FORMAT" --release "$RELEASE" \
+            --target "$TARGET" --arch "$ARCH" 2>&1 | tee build.log
+      - name: Upload separate package bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.bundle }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-${{ matrix.bundle }}
+          path: |
+            build.log
+            build/sdk/.config
+            build/sdk/logs/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+
+  release:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download all package bundles
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*-openwrt-*'
+          path: dist
+          merge-multiple: true
+      - name: Create checksums and release notes
+        run: |
+          cd dist
+          sha256sum -- *.tar.gz > SHA256SUMS
+          cat > RELEASE-NOTES.md <<'EOF'
+          tinc and FRR are built separately with the official OpenWrt release SDKs.
+
+          - `ipk`: OpenWrt 24.10; `apk`: OpenWrt 25.12.
+          - Download the archive matching your firmware release and package architecture.
+          - Each archive contains native packages, built dependencies, checksums,
+            build provenance, and INSTALL.md. FRR daemons remain separate packages.
+          - Kernel modules such as tinc's kmod-tun must come from your running firmware's feed.
+          - OpenWrt APKs are intended for OpenWrt, not Alpine Linux or Android.
+          EOF
+      - name: Publish tag release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag --title "$TAG" \
+              --notes-file dist/RELEASE-NOTES.md
+          fi
+          gh release upload "$TAG" dist/*.tar.gz dist/SHA256SUMS --clobber

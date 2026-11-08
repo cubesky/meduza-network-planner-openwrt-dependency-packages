@@ -1,0 +1,8 @@
+/build/
+/downloads/
+/output/
+/dist/
+/.tools/
+/build.log
+__pycache__/
+*.pyc
