@@ -47,7 +47,10 @@ if [ "$PACKAGE" = tinc ]; then
   test -s /tmp/tinc-key-smoke/rsa_key.priv
   test -s /tmp/tinc-key-smoke/ed25519_key.priv
 else
+  # json-c 0.18's apps subdirectory still requests CMake 2.8 policies.
+  # CMake 4 removed that compatibility; set the supported policy floor externally.
   cmake -S /build/json-c -B /build/json-c-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
     -DCMAKE_INSTALL_PREFIX="$deps" -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
     -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DBUILD_TESTING=OFF -DDISABLE_WERROR=ON
   cmake --build /build/json-c-build -j "$jobs"

@@ -16,6 +16,9 @@ def main():
     version = lock["packages"][args.package]["version"]
     script = r'''
 set -eu
+# This container runs sh instead of /sbin/init; OpenWrt's /var points into /tmp.
+# Create the volatile directories normally prepared during boot before opkg/apk.
+mkdir -p /tmp /var/lock /var/run
 base="/pkgs/${PACKAGE}_${VERSION}_x86_64.${FORMAT}"
 case "$FORMAT" in
   ipk) opkg install "$base"
