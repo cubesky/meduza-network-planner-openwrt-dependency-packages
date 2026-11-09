@@ -94,8 +94,10 @@ else
     --disable-doc --disable-backtrace --disable-snmp --disable-rpki --disable-werror \
     --disable-sysrepo --disable-grpc --disable-zeromq --disable-fpm \
     LIBS="$frr_libs" || { cat config.log >&2; exit 1; }
-  make -j"$jobs"
-  make DESTDIR=/stage install
+  # Libtool's -static only selects static libtool libraries; libc can stay dynamic.
+  # Apply -all-static to executables only, including any install-time relinks.
+  make -j"$jobs" AC_LDFLAGS_EXEC=-all-static
+  make DESTDIR=/stage AC_LDFLAGS_EXEC=-all-static install
   for bin in babeld bfdd bgpd eigrpd fabricd isisd ldpd nhrpd ospfd ospf6d pathd pbrd \
     pimd pim6d ripd ripngd staticd vrrpd watchfrr zebra mgmtd vtysh; do
     path=$(find /stage/usr -type f -name "$bin" | head -n 1)
@@ -110,7 +112,10 @@ for binary in "$out/bin/"*; do
   strip "$binary"
   if readelf -l "$binary" | grep -q 'Requesting program interpreter' || \
      readelf -d "$binary" 2>/dev/null | grep -q '(NEEDED)'; then
-    echo "Not a static ELF: $binary" >&2; exit 1
+    echo "Not a static ELF: $binary" >&2
+    readelf -l "$binary" >&2
+    readelf -d "$binary" >&2
+    exit 1
   fi
   timeout 30 "$binary" --version
 done
