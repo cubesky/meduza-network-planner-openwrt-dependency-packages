@@ -1,0 +1,26 @@
+Subject: [PATCH] lib: omit the shared-library launcher interpreter in bundled builds
+
+libfrr's optional executable-library version helper embeds an .interp
+section. Archiving that same object into libfrr.a carries PT_INTERP into
+fully static daemons. musl then enters its dynamic loader with no dynamic
+dependencies (and, for non-PIE, no dynamic table), crashing during startup.
+
+These packages ship daemon executables, not a directly executed libfrr.so.
+Omit the optional library launcher section. The compiler/linker still emits
+the normal interpreter for genuinely dynamically linked executables.
+
+Upstream-Status: Inappropriate [packaging: the executable-library launcher is not shipped]
+
+--- a/lib/libfrr.c
++++ b/lib/libfrr.c
+@@ -1455,10 +1455,6 @@
+ 	*statep = NULL;
+ }
+ 
+-#ifdef INTERP
+-static const char interp[]
+-	__attribute__((section(".interp"), used)) = INTERP;
+-#endif
+ /*
+  * executable entry point for libfrr.so
+  *

@@ -14,6 +14,8 @@ tinc 和 FRR 分开编译，为 [meduza-network-planner-v2](https://github.com/c
 
 构建不下载 OpenWrt SDK。第三方库优先嵌入程序，以避免引入 Alpine 专用共享库；使用系统加载器或 `libc.so` 的包会声明 OpenWrt `libc` 依赖。验收以 OpenWrt 上的实际运行结果为准，不要求程序必须无解释器。源码与校验值记录在 `ci/sources.lock.json`，每次下载均校验；损坏或截断的响应会自动重试，最多 4 次。
 
+当前 FRR 配方使用非 PIE 的静态可执行文件，避免 Alpine 默认 PIE 与 Libtool `-all-static`、`-export-dynamic` 组合导致启动和 TLS 异常；同时移除 `libfrr` 为可执行共享库版本查询嵌入的 `.interp` 段，避免该段通过静态归档进入守护进程、错误启动 musl 动态加载器。编译守护进程前会使用相同链接参数检查主线程和新线程的 TLS，安装后逐个运行二进制；失败日志会标明程序名、退出码及 ELF 信息。
+
 | musl 编译目标 | 构建平台 / 别名 | 输出 OpenWrt 架构 |
 | --- | --- | --- |
 | x86_64-unknown-linux-musl | linux/amd64、linux-amd64、x64 | x86_64 |

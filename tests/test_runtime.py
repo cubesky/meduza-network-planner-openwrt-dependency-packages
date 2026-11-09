@@ -21,14 +21,19 @@ CONFIG = json.loads((ROOT / "ci/targets.json").read_text())
 
 
 class ElfTests(unittest.TestCase):
-    def test_reported_frr_outputs_allow_the_openwrt_loader_on_all_three_platforms(self):
+    def test_reported_mixed_static_pie_outputs_are_rejected_on_all_three_platforms(self):
         for target, fixture in zip(CONFIG["targets"], ("amd64", "arm64", "armv7")):
             with self.subTest(platform=target["platform"]):
                 report = (ROOT / f"tests/fixtures/frr-{fixture}.readelf.txt").read_text()
-                info = elf.validate_elf(f"  Machine: {target['machine']}\n", report, report, target)
+                with self.assertRaisesRegex(ValueError, "Mixed static/PIE"):
+                    elf.validate_elf(f"  Machine: {target['machine']}\n", report, report, target)
+
+    def test_openwrt_dynamic_musl_is_supported_on_all_three_platforms(self):
+        for target in CONFIG["targets"]:
+            with self.subTest(platform=target["platform"]):
+                program = f"INTERP\n[Requesting program interpreter: {target['interpreter']}]"
+                info = elf.validate_elf(f"Machine: {target['machine']}\n", program, "(NEEDED) [libc.so]", target)
                 self.assertFalse(info["static"])
-                self.assertEqual(info["interpreter"], target["interpreter"])
-                self.assertEqual(info["needed"], [])
                 self.assertEqual(info["systemPackages"], ["libc"])
 
     def test_fully_static_programs_remain_supported(self):
@@ -43,6 +48,8 @@ class ElfTests(unittest.TestCase):
         program = f"INTERP\n [Requesting program interpreter: {target['interpreter']}]"
         result = elf.validate_elf(header, program, "(NEEDED) Shared library: [libc.so]", target)
         self.assertEqual(result["needed"], ["libc.so"])
+        with self.assertRaisesRegex(ValueError, "requires"):
+            elf.validate_elf(header, "", "(NEEDED) Shared library: [libc.so]", target)
         for library in ("libfrr.so.0", "libc.musl-x86_64.so.1", "libreadline.so.8"):
             with self.subTest(library=library), self.assertRaisesRegex(ValueError, "Unpackaged"):
                 elf.validate_elf(header, program, f"(NEEDED) Shared library: [{library}]", target)
@@ -57,7 +64,7 @@ class ElfTests(unittest.TestCase):
     def test_host_checks_never_execute_openwrt_dynamic_binaries(self):
         target = CONFIG["targets"][0]
         report = (ROOT / "tests/fixtures/frr-amd64.readelf.txt").read_text()
-        with patch.object(elf.subprocess, "check_output", side_effect=[f"Machine: {target['machine']}\n", report, report] * len(openwrt.FRR_BINS)), patch.object(build, "run") as execute:
+        with patch.object(elf.subprocess, "check_output", side_effect=[f"Machine: {target['machine']}\n", report, "(NEEDED) [libc.so]"] * len(openwrt.FRR_BINS)), patch.object(build, "run") as execute:
             result = build.check_binaries(Path("/test"), target, "frr")
         self.assertEqual(len(result), len(openwrt.FRR_BINS))
         self.assertTrue(all(info["systemPackages"] == ["libc"] for info in result.values()))

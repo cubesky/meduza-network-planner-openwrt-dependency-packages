@@ -23,6 +23,10 @@ def validate_elf(header, program, dynamic, target):
     unsupported = set(needed) - {"libc.so"}
     if unsupported:
         raise ValueError(f"Unpackaged OpenWrt shared libraries: {sorted(unsupported)}")
+    if interpreter is not None and not needed:
+        raise ValueError("Mixed static/PIE ELF: musl interpreter present but no shared libc dependency")
+    if needed and interpreter is None:
+        raise ValueError("Shared libc dependency requires the OpenWrt musl interpreter")
     static = interpreter is None and not needed
     return {"static": static, "interpreter": interpreter, "needed": needed,
             "systemPackages": [] if static else ["libc"]}

@@ -17,10 +17,13 @@ base="/pkgs/${PACKAGE}_${VERSION}_${ARCH}.${FORMAT}"
 case "$FORMAT" in
   ipk) opkg install "$base"
        if [ "$PACKAGE" = frr ]; then opkg install /pkgs/frr-*_${VERSION}_${ARCH}.ipk; fi ;;
-  apk) apk add --allow-untrusted --no-network "$base"
-       if [ "$PACKAGE" = frr ]; then apk add --allow-untrusted --no-network /pkgs/frr-*_${VERSION}_${ARCH}.apk; fi ;;
+  # Disposable rootfs containers can run from tmpfs without a persistent APK cache.
+  apk) apk add --allow-untrusted --no-network --force-non-repository "$base"
+       if [ "$PACKAGE" = frr ]; then apk add --allow-untrusted --no-network --force-non-repository /pkgs/frr-*_${VERSION}_${ARCH}.apk; fi ;;
 esac
-for bin in $BINARIES; do "$bin" --version; done
+for bin in $BINARIES; do
+  case "$bin" in */vtysh) "$bin" --help ;; *) "$bin" --version ;; esac
+done
 if [ "$PACKAGE" = tinc ]; then
   /usr/sbin/tinc -b -c /tmp/tinc-native-smoke init smoke
   test -s /tmp/tinc-native-smoke/rsa_key.priv

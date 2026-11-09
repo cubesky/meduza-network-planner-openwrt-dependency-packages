@@ -71,8 +71,10 @@ else
   cmake --build /build/yang-build -j "$jobs"
   cmake --install /build/yang-build
   cd /build/frr
-  # Backport upstream's mgmtd archive order before generating Makefile.in.
-  patch --batch --fuzz=0 -p1 < /recipe/patches/frr/0001-mgmtd-static-link-order.patch
+  # Apply the archive-order backport and omit libfrr's embedded .interp launcher.
+  for fix in /recipe/patches/frr/*.patch; do
+    patch --batch --fuzz=0 -p1 < "$fix"
+  done
   ./bootstrap.sh
   # clippy embeds Python and is only a code-generation tool. Build it dynamically
   # first; --enable-static-bin must apply to shipped daemons, not to host Python.
@@ -94,10 +96,16 @@ else
     --disable-doc --disable-backtrace --disable-snmp --disable-rpki --disable-werror \
     --disable-sysrepo --disable-grpc --disable-zeromq --disable-fpm \
     LIBS="$frr_libs" || { cat config.log >&2; exit 1; }
-  # Embed third-party libraries to avoid Alpine-specific shared-library ABIs.
-  # A compatible musl interpreter is allowed; OpenWrt userspace is the run gate.
-  make -j"$jobs" AC_LDFLAGS_EXEC=-all-static
-  make DESTDIR=/stage AC_LDFLAGS_EXEC=-all-static install
+  # Alpine defaults to PIE. Combining that with libtool's -all-static and
+  # -export-dynamic produces a broken musl startup/TLS layout. Use a non-PIE
+  # executable for this static link; normal dynamic OpenWrt ELFs remain allowed.
+  frr_exec_ldflags="-all-static -no-pie"
+  echo "Checking FRR musl startup and per-thread TLS"
+  ./libtool --quiet --tag=CC --mode=link cc $CFLAGS $frr_exec_ldflags \
+    -export-dynamic -pthread /recipe/musl-startup-smoke.c -o /build/frr-startup-smoke
+  timeout 30 /build/frr-startup-smoke
+  make -j"$jobs" AC_LDFLAGS_EXEC="$frr_exec_ldflags"
+  make DESTDIR=/stage AC_LDFLAGS_EXEC="$frr_exec_ldflags" install
   for bin in babeld bfdd bgpd eigrpd fabricd isisd ldpd nhrpd ospfd ospf6d pathd pbrd \
     pimd pim6d ripd ripngd staticd vrrpd watchfrr zebra mgmtd vtysh; do
     path=$(find /stage/usr -type f -name "$bin" | head -n 1)
@@ -110,7 +118,19 @@ fi
 
 for binary in "$out/bin/"*; do
   strip "$binary"
-  timeout 30 "$binary" --version
 done
 python3 /recipe/elf.py --platform "$TARGETPLATFORM" --bin-dir "$out/bin" --output "$out/runtime.json"
+for binary in "$out/bin/"*; do
+  # vtysh 10.4 has no --version option; --help includes its version banner.
+  case "${binary##*/}" in vtysh) option=--help ;; *) option=--version ;; esac
+  echo "Smoke test: $binary $option"
+  if timeout 30 "$binary" "$option"; then
+    :
+  else
+    code=$?
+    echo "Smoke test failed: $binary (exit $code)" >&2
+    readelf -h -l -d "$binary" >&2
+    exit "$code"
+  fi
+done
 cp "$lock" "$out/sources.lock.json"

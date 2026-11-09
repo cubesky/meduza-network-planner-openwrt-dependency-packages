@@ -12,6 +12,7 @@ COPY ci/sources.lock.json /recipe/lock.json
 COPY ci/elf.py ci/targets.json /recipe/
 COPY downloads/ /archives/
 COPY build/build.sh /recipe/build.sh
+COPY build/musl-startup-smoke.c /recipe/musl-startup-smoke.c
 COPY build/patches/ /recipe/patches/
 RUN PACKAGE="$PACKAGE" TARGETPLATFORM="$TARGETPLATFORM" BUILD_JOBS="$BUILD_JOBS" \
     sh /recipe/build.sh /recipe/lock.json /out

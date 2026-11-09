@@ -28,6 +28,25 @@ def archives(source):
 
 @unittest.skipUnless(PATCH and CC[0] and AR[0] and (not ZIG or LLD), "Requires patch and a C compiler/archiver (or Zig and LLD on Windows)")
 class FrrStaticLinkTests(unittest.TestCase):
+    def test_libfrr_patch_removes_the_forced_interpreter_from_compiled_objects(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            (work / "lib").mkdir()
+            source = work / "lib/libfrr.c"
+            source.write_text((ROOT / "tests/fixtures/frr-libfrr-interp.c").read_text(), newline="\n")
+            def compile_object(name):
+                result = subprocess.run([*CC, "-g0", "-fno-sanitize=all", "-c", str(source), "-o", name], cwd=work, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                return (work / name).read_bytes()
+            original = compile_object("original.o")
+            self.assertIn(b".interp\0", original)
+            self.assertIn(b"/lib/ld-musl-x86_64.so.1\0", original)
+            applied = subprocess.run([PATCH, "--batch", "--fuzz=0", "-p1", "-i", str(ROOT / "build/patches/frr/0002-omit-libfrr-interpreter-section.patch")], cwd=work, capture_output=True, text=True)
+            self.assertEqual(applied.returncode, 0, applied.stdout + applied.stderr)
+            fixed = compile_object("fixed.o")
+            self.assertNotIn(b".interp\0", fixed)
+            self.assertNotIn(b"/lib/ld-musl-x86_64.so.1\0", fixed)
+
     def test_mgmtd_patch_resolves_rip_cli_static_archive_backreferences(self):
         # Model the reported references in separate objects, as in libfrr.a.
         sources = {
