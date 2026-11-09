@@ -6,13 +6,13 @@ tinc 和 FRR 分开编译，为 [meduza-network-planner-v2](https://github.com/c
 
 同步基准为主项目提交 `7b3a4a9ecc551e537c4325ed08a4f00409bc5a4a` 的 `tools/release/src/openwrt.rs`、`tools/openwrt-apk.sh` 及 provider 构建流程：
 
-- 使用同一个固定 digest 的 Alpine 3.24 镜像，通过 Podman / QEMU 在目标平台编译完整静态 musl 二进制。
+- 使用同一个固定 digest 的 Alpine 3.24 镜像，通过 Podman / QEMU 在目标平台编译 musl 二进制；允许使用 OpenWrt 自带的 musl 加载器。
 - 按同一个 musl 目标到 OpenWrt 架构的映射，一次编译生成多个原生包。完整构建共 6 个任务：2 个软件 × 3 个平台。
 - ipk 使用带 `./` 路径的 gzip/tar 外层与 `debian-binary`、`data.tar.gz`、`control.tar.gz`。
 - apk 使用同一个固定镜像的 `apk mkpkg` 生成 APK v3 / ADB 格式；打包容器禁用网络。
 - 两种格式均命名为 `<package>_<version>_<arch>.ipk|apk`，每个文件附带主项目同结构的 `.json` 产物描述，包括 `openwrt/<arch>`、大小和 SHA256。
 
-构建不再下载 OpenWrt SDK；tinc、FRR 及其依赖静态链接。源码与校验值记录在 `ci/sources.lock.json`，每次下载均校验；损坏或截断的响应会自动重试，最多 4 次。
+构建不下载 OpenWrt SDK。第三方库优先嵌入程序，以避免引入 Alpine 专用共享库；使用系统加载器或 `libc.so` 的包会声明 OpenWrt `libc` 依赖。验收以 OpenWrt 上的实际运行结果为准，不要求程序必须无解释器。源码与校验值记录在 `ci/sources.lock.json`，每次下载均校验；损坏或截断的响应会自动重试，最多 4 次。
 
 | musl 编译目标 | 构建平台 / 别名 | 输出 OpenWrt 架构 |
 | --- | --- | --- |
@@ -32,7 +32,9 @@ tinc 和 FRR 分开编译，为 [meduza-network-planner-v2](https://github.com/c
 
 tinc 包提供 `/usr/sbin/tinc`、`/usr/sbin/tincd`。FRR 分为主包 `frr` 与 22 个二进制子包，包括 `frr-zebra`、`frr-mgmtd`、`frr-vtysh`、`frr-bgpd`、`frr-bfdd`、`frr-ospfd` 等；子包依赖相同版本的主包。所有进程由 Meduza NP 管理，附带的独立 procd 服务默认不启用。
 
-每个平台先检查 ELF 架构、无解释器、无动态依赖，再原生或经 QEMU 运行二进制。tinc 额外测试 RSA / Ed25519 密钥生成。x86_64 的两种包格式还在与主项目相同版本的真实 OpenWrt userspace 容器中执行安装、运行和卸载。安装说明见 [INSTALL.md](INSTALL.md)。这些检查由 GitHub CI 执行；辅助脚本测试可在 Windows 本地执行。
+每个平台检查 ELF 架构、对应的 OpenWrt musl 加载器和共享库依赖，拒绝未打包的第三方共享库。`build-info.json` 如实记录每个程序的解释器、动态依赖及是否完全静态。
+
+三个平台均在真实 OpenWrt userspace 中执行原生包安装、全部二进制运行和卸载：ipk 使用 24.10.8，apk 使用 25.12.6。验收 rootfs 来自 OpenWrt 官方下载站，SHA256 固定在 `ci/targets.json`，通过 Podman 导入对应平台，ARM 经 QEMU 执行。tinc 额外测试 RSA / Ed25519 密钥生成，FRR 额外检查 `vtysh` 配置解析。手动选择某个架构时，发布产物仍按指定架构生成；必要的原生验收包保存在 `out/`，仅供 CI 使用。安装说明见 [INSTALL.md](INSTALL.md)。这些运行检查由 GitHub CI 执行；辅助脚本测试可在 Windows 本地执行。
 
 ## 维护
 

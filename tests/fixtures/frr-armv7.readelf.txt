@@ -1,0 +1,52 @@
+Elf file type is DYN (Position-Independent Executable file)
+Entry point 0x4d285
+There are 10 program headers, starting at offset 52
+
+Program Headers:
+  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
+  ARM_EXIDX      0x29f614 0x0029f614 0x0029f614 0x05db0 0x05db0 R   0x4
+  PHDR           0x000034 0x00000034 0x00000034 0x00140 0x00140 R   0x4
+  INTERP         0x0001d8 0x000001d8 0x000001d8 0x00018 0x00018 R   0x1
+      [Requesting program interpreter: /lib/ld-musl-armhf.so.1]
+  LOAD           0x000000 0x00000000 0x00000000 0x2a53c8 0x2a53c8 R E 0x1000
+  LOAD           0x2a6148 0x002a6148 0x002a6148 0x41910 0x4b7dc RW  0x1000
+  DYNAMIC        0x2c19c0 0x002c19c0 0x002c19c0 0x000b8 0x000b8 RW  0x4
+  NOTE           0x000174 0x00000174 0x00000174 0x00064 0x00064 R   0x4
+  TLS            0x2a6148 0x002a6148 0x002a6148 0x00010 0x0024c R   0x8
+  GNU_STACK      0x000000 0x00000000 0x00000000 0x00000 0x00000 RW  0x10
+  GNU_RELRO      0x2a6148 0x002a6148 0x002a6148 0x1beb8 0x1beb8 R   0x1
+
+ Section to Segment mapping:
+  Segment Sections...
+   00     .ARM.exidx 
+   01     
+   02     .interp 
+   03     .note.gnu.build-id .note.FRR .interp .gnu.hash .dynsym .dynstr .rel.dyn .init .text .fini .rodata .ARM.extab .ARM.exidx .eh_frame 
+   04     .tdata .init_array .fini_array .data.rel.ro .dynamic .got .data xref_array .bss 
+   05     .dynamic 
+   06     .note.gnu.build-id .note.FRR 
+   07     .tdata .tbss 
+   08     
+   09     .tdata .init_array .fini_array .data.rel.ro .dynamic .got 
+
+Dynamic section at offset 0x2c19c0 contains 19 entries:
+  Tag        Type                         Name/Value
+ 0x0000000c (INIT)                       0x48365
+ 0x0000000d (FINI)                       0x1f648d
+ 0x00000019 (INIT_ARRAY)                 0x2a6158
+ 0x0000001b (INIT_ARRAYSZ)               1000 (bytes)
+ 0x0000001a (FINI_ARRAY)                 0x2a6540
+ 0x0000001c (FINI_ARRAYSZ)               788 (bytes)
+ 0x6ffffef5 (GNU_HASH)                   0x1f0
+ 0x00000005 (STRTAB)                     0x15cf0
+ 0x00000006 (SYMTAB)                     0x6dd0
+ 0x0000000a (STRSZ)                      67113 (bytes)
+ 0x0000000b (SYMENT)                     16 (bytes)
+ 0x00000015 (DEBUG)                      0x0
+ 0x00000011 (REL)                        0x2631c
+ 0x00000012 (RELSZ)                      139336 (bytes)
+ 0x00000013 (RELENT)                     8 (bytes)
+ 0x0000001e (FLAGS)                      BIND_NOW
+ 0x6ffffffb (FLAGS_1)                    Flags: NOW PIE
+ 0x6ffffffa (RELCOUNT)                   17412
+ 0x00000000 (NULL)                       0x0

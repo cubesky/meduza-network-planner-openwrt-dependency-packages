@@ -9,6 +9,7 @@ RUN apk add --no-cache build-base linux-headers perl autoconf automake libtool p
     readline-dev readline-static ncurses-dev ncurses-static libcap-dev libcap-static \
     protobuf-c-compiler
 COPY ci/sources.lock.json /recipe/lock.json
+COPY ci/elf.py ci/targets.json /recipe/
 COPY downloads/ /archives/
 COPY build/build.sh /recipe/build.sh
 COPY build/patches/ /recipe/patches/

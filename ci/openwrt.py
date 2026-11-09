@@ -41,10 +41,10 @@ def tar_gz(files, directories=True):
 def control_text(name, version, arch, files, depends):
     text = f"Package: {name}\nVersion: {version}\n"
     if depends:
-        text += "Depends: " + ", ".join(f"{dep} (= {version})" for dep in depends) + "\n"
+        text += "Depends: " + ", ".join(f"{dep} (= {version})" if dep == "frr" else dep for dep in depends) + "\n"
     return text + (f"License: GPL-2.0-or-later\nSection: net\nArchitecture: {arch}\n"
                    f"Installed-Size: {sum(len(data) for data, mode in files.values())}\n"
-                   f"Maintainer: Meduza NP\nDescription: Static musl {name} for Meduza NP\n")
+                   f"Maintainer: Meduza NP\nDescription: OpenWrt {name} for Meduza NP\n")
 
 
 def write_ipk(files, name, version, arch, depends, output):
@@ -66,10 +66,10 @@ def write_apk_stage(files, name, version, arch, depends, output):
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(data)
         destination.chmod(mode)
-    info = [f"name:{name}", f"version:{version}", f"arch:{arch}", f"description:Static musl {name} for Meduza NP",
+    info = [f"name:{name}", f"version:{version}", f"arch:{arch}", f"description:OpenWrt {name} for Meduza NP",
             "license:GPL-2.0-or-later", f"origin:{name}", "maintainer:Meduza NP"]
     if depends:
-        info.append("depends:" + " ".join(f"{dep}={version}" for dep in depends))
+        info.append("depends:" + " ".join(f"{dep}={version}" if dep == "frr" else dep for dep in depends))
     command = "#!/bin/sh\nset -eu\nfind root -exec touch -h -d @0 {} +\nexec apk mkpkg"
     command += "".join(" \\\n  --info " + shlex.quote(value) for value in info)
     command += " \\\n  --files root --output " + shlex.quote("../" + output.name) + "\n"
@@ -97,6 +97,7 @@ def package_files(tree, package, provenance, repo):
                 if path.is_file():
                     files[prefix + path.relative_to(source).as_posix()] = file(path)
     common = {}
+    system_depends = provenance.get("runtime", {}).get("systemPackages", [])
     add_tree(common, tree / "licenses", f"usr/share/licenses/{package}/")
     common[f"usr/share/meduza-np-dependencies/{package}/build-info.json"] = (json.dumps(provenance, indent=2).encode() + b"\n", 0o644)
     if package == "tinc":
@@ -104,12 +105,12 @@ def package_files(tree, package, provenance, repo):
             common[f"usr/sbin/{name}"] = file(tree / "bin" / name, 0o755)
         common["etc/config/tinc"] = file(repo / "packaging/tinc.config")
         common["etc/init.d/tinc"] = file(repo / "packaging/tinc.init", 0o755)
-        return {"tinc": (common, [])}
+        return {"tinc": (common, system_depends)}
     add_tree(common, tree / "share", "usr/share/")
     common["etc/frr/frr.conf"] = (b"frr defaults traditional\nservice integrated-vtysh-config\n", 0o644)
     common["etc/frr/daemons"] = (b"# Standalone service only; leave disabled when managed by Meduza NP.\nDAEMONS='mgmtd zebra staticd bgpd bfdd ospfd'\n", 0o644)
     common["etc/init.d/frr"] = file(repo / "packaging/frr.init", 0o755)
-    result = {"frr": (common, [])}
+    result = {"frr": (common, system_depends)}
     for name in FRR_BINS:
         path = "usr/bin/vtysh" if name == "vtysh" else f"usr/sbin/{name}"
         result[f"frr-{name}"] = ({path: file(tree / "bin" / name, 0o755)}, ["frr"])

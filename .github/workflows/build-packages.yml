@@ -74,7 +74,7 @@ jobs:
         with:
           path: downloads
           key: static-sources-${{ runner.os }}-${{ hashFiles('ci/sources.lock.json') }}-${{ matrix.package }}
-      - name: Build static musl binaries and native OpenWrt packages
+      - name: Build musl binaries and native OpenWrt packages
         env:
           PACKAGE: ${{ matrix.package }}
           TARGET: ${{ matrix.target }}
@@ -85,13 +85,15 @@ jobs:
           python3 -u ci/build.py --package "$PACKAGE" --target "$TARGET" \
             --arches "$ARCHES" --formats "$FORMATS" 2>&1 | tee build.log
       - name: Install, run and remove packages in real OpenWrt userspace
-        if: matrix.platform == 'linux/amd64'
         env:
           PACKAGE: ${{ matrix.package }}
           FORMATS: ${{ matrix.formats }}
+          TARGET: ${{ matrix.target }}
+          ARCHES: ${{ matrix.arches }}
         run: |
           set -o pipefail
-          python3 -u ci/acceptance.py --package "$PACKAGE" --formats "$FORMATS" 2>&1 | tee -a build.log
+          python3 -u ci/acceptance.py --package "$PACKAGE" --target "$TARGET" \
+            --arches "$ARCHES" --formats "$FORMATS" 2>&1 | tee -a build.log
       - name: Upload native package files and matching artifact descriptors
         uses: actions/upload-artifact@v4
         with:

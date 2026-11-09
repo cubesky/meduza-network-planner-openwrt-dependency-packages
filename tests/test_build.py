@@ -147,6 +147,16 @@ class PackagingTests(unittest.TestCase):
             self.assertIn("--files root", script)
             self.assertEqual(json.loads((stage / "stage.json").read_text())["platform"], "openwrt/x86_64")
 
+    def test_openwrt_libc_dependency_does_not_use_the_frr_version(self):
+        text = openwrt.control_text("frr", "10.4.1-r1", "x86_64", {}, ["libc"])
+        self.assertIn("Depends: libc\n", text)
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "frr_10.4.1-r1_x86_64.apk"
+            stage = openwrt.write_apk_stage({}, "frr", "10.4.1-r1", "x86_64", ["libc"], output)
+            script = (stage / "mkpkg.sh").read_text()
+            self.assertIn("depends:libc", script)
+            self.assertNotIn("libc=10.4.1", script)
+
     def test_descriptors_match_main_project_schema_and_actual_bytes(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "tinc_1_x86_64.ipk"
@@ -163,8 +173,9 @@ class PackagingTests(unittest.TestCase):
             (tree / "bin").mkdir()
             for name in openwrt.FRR_BINS:
                 (tree / "bin" / name).write_bytes(b"ELF fixture")
-            packages = openwrt.package_files(tree, "frr", {"static": True}, ROOT)
+            packages = openwrt.package_files(tree, "frr", {"static": False, "runtime": {"systemPackages": ["libc"]}}, ROOT)
             self.assertEqual(len(packages), 23)
+            self.assertEqual(packages["frr"][1], ["libc"])
             for name in ("zebra", "bgpd", "bfdd", "ospfd", "mgmtd", "vtysh"):
                 self.assertIn("frr-" + name, packages)
             self.assertIn("usr/bin/vtysh", packages["frr-vtysh"][0])

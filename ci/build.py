@@ -1,4 +1,4 @@
-"""Static musl build + native OpenWrt ipk/apk packaging, matching the main project."""
+"""Native musl build + OpenWrt ipk/apk packaging, matching the main project's layout."""
 
 import argparse
 import json
@@ -8,6 +8,7 @@ import shutil
 import subprocess
 
 from common import download, sha256
+from elf import inspect_binary
 from openwrt import FRR_BINS, descriptor, package_files, write_apk_stage, write_ipk
 
 
@@ -18,17 +19,36 @@ def run(*command, **kwargs):
 
 def check_binaries(tree, target, package):
     names = ["tinc", "tincd"] if package == "tinc" else FRR_BINS
-    for name in names:
-        binary = tree / "bin" / name
-        header = subprocess.check_output(["readelf", "-h", str(binary)], text=True)
-        if not any(line.split(":", 1)[-1].strip() == target["machine"] for line in header.splitlines() if "Machine:" in line):
-            raise ValueError(f"Wrong ELF machine: {binary}")
-        program = subprocess.check_output(["readelf", "-l", str(binary)], text=True)
-        dynamic = subprocess.check_output(["readelf", "-d", str(binary)], text=True)
-        if "INTERP" in program or "(NEEDED)" in dynamic:
-            raise ValueError(f"Dynamic executable is not portable across OpenWrt architectures: {binary}")
-        command = [target["qemu"]] if target["qemu"] else []
-        run(*command, binary, "--version", timeout=60)
+    # Ubuntu has no OpenWrt musl loader. Run binaries in the builder and in the
+    # target OpenWrt rootfs, not directly on the host (including under bare QEMU).
+    return {name: inspect_binary(tree / "bin" / name, target) for name in names}
+
+
+def export_packages(packages, version, arches, formats, dist, builder_image):
+    dist.mkdir(parents=True, exist_ok=True)
+    for arch in arches:
+        for name, (files, depends) in packages.items():
+            for fmt in formats:
+                output = dist / f"{name}_{version}_{arch}.{fmt}"
+                if fmt == "ipk":
+                    write_ipk(files, name, version, arch, depends, output)
+                    descriptor(output, name, version, arch, fmt)
+                else:
+                    write_apk_stage(files, name, version, arch, depends, output)
+    stages = sorted(dist.glob("*.apk.stage"))
+    if stages:
+        run("podman", "run", "--rm", "--network=none", "--platform", "linux/amd64", "-v", f"{dist}:/w:Z",
+            builder_image, "sh", "-euc",
+            'for s in /w/*.apk.stage; do (cd "$s" && sh ./mkpkg.sh); done; chown -R "$(stat -c %u:%g /w)" /w')
+        for stage in stages:
+            info = json.loads((stage / "stage.json").read_text())
+            descriptor(dist / info["file"], info["package"], version, info["platform"].split("/", 1)[1], "apk")
+            shutil.rmtree(stage)
+    for fmt in formats:
+        for arch in arches:
+            for name in packages:
+                if not (dist / f"{name}_{version}_{arch}.{fmt}").is_file():
+                    raise ValueError(f"Missing output: {name}/{arch}/{fmt}")
 
 
 def main():
@@ -61,38 +81,22 @@ def main():
         "--build-arg", f"BUILDER_IMAGE={config['builder_image']}", "--build-arg", f"PACKAGE={args.package}",
         "--build-arg", f"TARGETPLATFORM={target['platform']}", "--build-arg", "BUILD_JOBS=2",
         "--output", f"type=local,dest={tree}", ".")
-    check_binaries(tree, target, args.package)
+    runtime = check_binaries(tree, target, args.package)
+    system_packages = sorted({dep for binary in runtime.values() for dep in binary["systemPackages"]})
     provenance = {"buildInfoVersion": 1, "package": args.package, "target": args.target, "platform": target["platform"],
-                  "static": True, "builder": config["builder_image"], "sources": sources,
+                  "static": all(binary["static"] for binary in runtime.values()),
+                  "runtime": {"binaries": runtime, "systemPackages": system_packages},
+                  "builder": config["builder_image"], "sources": sources,
                   "upstream": config["upstream"], "commit": os.getenv("GITHUB_SHA", "local"),
                   "binaries": {path.name: sha256(path) for path in sorted((tree / "bin").iterdir())}}
     packages = package_files(tree, args.package, provenance, repo)
     version = lock["packages"][args.package]["version"]
     dist = repo / "dist"
-    dist.mkdir(exist_ok=True)
-    for arch in arches:
-        for name, (files, depends) in packages.items():
-            for fmt in formats:
-                output = dist / f"{name}_{version}_{arch}.{fmt}"
-                if fmt == "ipk":
-                    write_ipk(files, name, version, arch, depends, output)
-                    descriptor(output, name, version, arch, fmt)
-                else:
-                    write_apk_stage(files, name, version, arch, depends, output)
-    stages = sorted(dist.glob("*.apk.stage"))
-    if stages:
-        run("podman", "run", "--rm", "--network=none", "--platform", "linux/amd64", "-v", f"{dist}:/w:Z",
-            config["builder_image"], "sh", "-euc",
-            'for s in /w/*.apk.stage; do (cd "$s" && sh ./mkpkg.sh); done; chown -R "$(stat -c %u:%g /w)" /w')
-        for stage in stages:
-            info = json.loads((stage / "stage.json").read_text())
-            descriptor(dist / info["file"], info["package"], version, info["platform"].split("/", 1)[1], "apk")
-            shutil.rmtree(stage)
-    for fmt in formats:
-        for arch in arches:
-            for name in packages:
-                if not (dist / f"{name}_{version}_{arch}.{fmt}").is_file():
-                    raise ValueError(f"Missing output: {name}/{arch}/{fmt}")
+    export_packages(packages, version, arches, formats, dist, config["builder_image"])
+    if target["acceptance_arch"] not in arches:
+        # Test the same payload under the rootfs's native package architecture,
+        # without forcing a foreign arch or publishing extra requested artifacts.
+        export_packages(packages, version, [target["acceptance_arch"]], formats, tree / "acceptance", config["builder_image"])
     print(f"Built {len(packages)} packages x {len(arches)} OpenWrt architectures x {len(formats)} formats")
 
 

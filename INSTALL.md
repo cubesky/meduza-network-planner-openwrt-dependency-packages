@@ -2,7 +2,7 @@
 
 从 Release 下载与设备架构对应的原生包。架构查询：`. /etc/openwrt_release; echo "$DISTRIB_ARCH"`。OpenWrt 24.10 使用 ipk，25.12+ 使用 APK v3。先下载 `SHA256SUMS`，用 `sha256sum -c --ignore-missing SHA256SUMS` 校验本地包，并确认命令成功。
 
-这些包与主项目采用相同的静态 musl 构建和 OpenWrt 架构映射，文件名统一为 `<package>_<version>_<arch>.<format>`。每个文件的 `.json` 还记录了平台、大小与 SHA256。
+这些包与主项目采用相同的 musl 平台和 OpenWrt 架构映射，支持完全静态程序及使用 OpenWrt 自带 musl 加载器的程序。需要系统运行时时，原生包会声明 `libc` 依赖，由包管理器检查。文件名统一为 `<package>_<version>_<arch>.<format>`，每个文件的 `.json` 还记录了平台、大小与 SHA256。
 
 ## tinc
 
@@ -38,7 +38,7 @@ apk add --allow-untrusted ./frr_*_aarch64_generic.apk ./frr-zebra_*_aarch64_gene
   ./frr-bgpd_*_aarch64_generic.apk ./frr-bfdd_*_aarch64_generic.apk ./frr-ospfd_*_aarch64_generic.apk
 ```
 
-按需安装其他 `frr-*` 协议包。所有守护进程位于 `/usr/sbin`，`vtysh` 位于 `/usr/bin`，符合主项目的系统二进制探测和同目录守护进程查找方式。软件包中的 `build-info.json` 记录静态二进制、源码摘要、构建镜像和同步的主项目提交。
+按需安装其他 `frr-*` 协议包。所有守护进程位于 `/usr/sbin`，`vtysh` 位于 `/usr/bin`，符合主项目的系统二进制探测和同目录守护进程查找方式。软件包中的 `build-info.json` 记录每个程序的解释器、共享库依赖、静态链接状态、源码摘要、构建镜像和同步的主项目提交。
 
 ## 由 Meduza NP 管理
 

@@ -94,8 +94,8 @@ else
     --disable-doc --disable-backtrace --disable-snmp --disable-rpki --disable-werror \
     --disable-sysrepo --disable-grpc --disable-zeromq --disable-fpm \
     LIBS="$frr_libs" || { cat config.log >&2; exit 1; }
-  # Libtool's -static only selects static libtool libraries; libc can stay dynamic.
-  # Apply -all-static to executables only, including any install-time relinks.
+  # Embed third-party libraries to avoid Alpine-specific shared-library ABIs.
+  # A compatible musl interpreter is allowed; OpenWrt userspace is the run gate.
   make -j"$jobs" AC_LDFLAGS_EXEC=-all-static
   make DESTDIR=/stage AC_LDFLAGS_EXEC=-all-static install
   for bin in babeld bfdd bgpd eigrpd fabricd isisd ldpd nhrpd ospfd ospf6d pathd pbrd \
@@ -110,13 +110,7 @@ fi
 
 for binary in "$out/bin/"*; do
   strip "$binary"
-  if readelf -l "$binary" | grep -q 'Requesting program interpreter' || \
-     readelf -d "$binary" 2>/dev/null | grep -q '(NEEDED)'; then
-    echo "Not a static ELF: $binary" >&2
-    readelf -l "$binary" >&2
-    readelf -d "$binary" >&2
-    exit 1
-  fi
   timeout 30 "$binary" --version
 done
+python3 /recipe/elf.py --platform "$TARGETPLATFORM" --bin-dir "$out/bin" --output "$out/runtime.json"
 cp "$lock" "$out/sources.lock.json"

@@ -8,10 +8,25 @@
   "builder_image": "docker.io/library/alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a",
   "formats": ["ipk", "apk"],
   "targets": [
-    {"target": "x86_64-unknown-linux-musl", "platform": "linux/amd64", "machine": "Advanced Micro Devices X86-64", "qemu": "", "arches": ["x86_64"], "aliases": ["x64", "amd64", "linux-amd64"]},
-    {"target": "aarch64-unknown-linux-musl", "platform": "linux/arm64", "machine": "AArch64", "qemu": "qemu-aarch64-static", "arches": ["aarch64_generic", "aarch64_cortex-a53", "aarch64_cortex-a72", "aarch64_cortex-a76"], "aliases": ["arm64", "aarch64", "linux-arm64"]},
-    {"target": "armv7-unknown-linux-musleabihf", "platform": "linux/arm/v7", "machine": "ARM", "qemu": "qemu-arm-static", "arches": ["arm_cortex-a7_neon-vfpv4", "arm_cortex-a9_vfpv3-d16", "arm_cortex-a15_neon-vfpv4"], "aliases": ["arm-v7", "armv7", "linux-arm-v7"]}
+    {
+      "target": "x86_64-unknown-linux-musl", "platform": "linux/amd64", "machine": "Advanced Micro Devices X86-64", "qemu": "",
+      "interpreter": "/lib/ld-musl-x86_64.so.1", "openwrt_target": "x86/64", "acceptance_arch": "x86_64",
+      "rootfs_sha256": {"ipk": "6c94190246a54088e3984fc0c4cbbb518972abb2b10a28e30a0c41554eea8b9d", "apk": "55e52bb34de582a1ebe56bd50f94ff54ac7c77f5bca9cae807656d1930456da4"},
+      "arches": ["x86_64"], "aliases": ["x64", "amd64", "linux-amd64"]
+    },
+    {
+      "target": "aarch64-unknown-linux-musl", "platform": "linux/arm64", "machine": "AArch64", "qemu": "qemu-aarch64-static",
+      "interpreter": "/lib/ld-musl-aarch64.so.1", "openwrt_target": "armsr/armv8", "acceptance_arch": "aarch64_generic",
+      "rootfs_sha256": {"ipk": "eab7e31f508ff0af1d47afc779eb08f237bb0f1cec5014592afe4893a06318a3", "apk": "8fcb00eb886d9add37e111a4ec43d47d57aa74742281c6a8f348a7a7ec37edb7"},
+      "arches": ["aarch64_generic", "aarch64_cortex-a53", "aarch64_cortex-a72", "aarch64_cortex-a76"], "aliases": ["arm64", "aarch64", "linux-arm64"]
+    },
+    {
+      "target": "armv7-unknown-linux-musleabihf", "platform": "linux/arm/v7", "machine": "ARM", "qemu": "qemu-arm-static",
+      "interpreter": "/lib/ld-musl-armhf.so.1", "openwrt_target": "armsr/armv7", "acceptance_arch": "arm_cortex-a15_neon-vfpv4",
+      "rootfs_sha256": {"ipk": "8ea759dd925d530b2cc293e39658e92f9a4703635dcb79af3b3352f9cd0adf49", "apk": "f0e25d1b7abd6d317e416aed915820d85b8f1e2c457c1b2c38522e91c1e31aca"},
+      "arches": ["arm_cortex-a7_neon-vfpv4", "arm_cortex-a9_vfpv3-d16", "arm_cortex-a15_neon-vfpv4"], "aliases": ["arm-v7", "armv7", "linux-arm-v7"]
+    }
   ],
   "architecture_aliases": {"arm_cortex-a7": "arm_cortex-a7_neon-vfpv4", "arm_cortex-a9_vfpv3": "arm_cortex-a9_vfpv3-d16", "arm_cortex-a15": "arm_cortex-a15_neon-vfpv4"},
-  "acceptance_images": {"ipk": "docker.io/openwrt/rootfs:x86_64-v24.10.8", "apk": "docker.io/openwrt/rootfs:x86-64-25.12.6"}
+  "acceptance_releases": {"ipk": "24.10.8", "apk": "25.12.6"}
 }
