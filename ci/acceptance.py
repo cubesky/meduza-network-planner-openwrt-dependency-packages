@@ -22,11 +22,11 @@ case "$FORMAT" in
        if [ "$PACKAGE" = frr ]; then apk add --allow-untrusted --no-network --force-non-repository /pkgs/frr-*_${VERSION}_${ARCH}.apk; fi ;;
 esac
 if [ "$PACKAGE" = frr ]; then
-  # Meduza's FRR plan chowns both its pathspace and generated configuration.
-  id frr
+  # Match the OpenWrt feed's compiled-in network user/group.
+  id network
   mkdir -p /var/run/frr/meduza-smoke /tmp/frr-generation-smoke
-  chown frr:frr /var/run/frr/meduza-smoke
-  chown -R frr:frr /tmp/frr-generation-smoke
+  chown network:network /var/run/frr/meduza-smoke
+  chown -R network:network /tmp/frr-generation-smoke
 fi
 for bin in $BINARIES; do
   case "$bin" in */vtysh) "$bin" --help ;; *) "$bin" --version ;; esac
@@ -37,6 +37,31 @@ if [ "$PACKAGE" = tinc ]; then
   test -s /tmp/tinc-native-smoke/ed25519_key.priv
 else
   /usr/bin/vtysh -C -f /etc/frr/frr.conf
+  # Exercise the compiled-in account, socket permissions and a private 0600
+  # generation config, as the Meduza plan does. No routing or BGP listener.
+  printf 'hostname meduza-smoke\nrouter bgp 65001\n bgp router-id 192.0.2.1\n' > /tmp/frr-generation-smoke/bgpd.conf
+  chown network:network /tmp/frr-generation-smoke/bgpd.conf
+  chmod 0600 /tmp/frr-generation-smoke/bgpd.conf
+  /usr/sbin/bgpd -N meduza-smoke -f /tmp/frr-generation-smoke/bgpd.conf -p 0 -Z > /tmp/frr-bgpd-smoke.log 2>&1 &
+  pid=$!
+  trap 'kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true' EXIT
+  ready=false
+  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    if [ -S /var/run/frr/meduza-smoke/bgpd.vty ]; then ready=true; break; fi
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 1
+  done
+  if [ "$ready" != true ]; then cat /tmp/frr-bgpd-smoke.log; exit 1; fi
+  set -- $(sed -n 's/^Uid:[[:space:]]*//p' "/proc/$pid/status")
+  test "$2" = "$(id -u network)"
+  set -- $(sed -n 's/^Gid:[[:space:]]*//p' "/proc/$pid/status")
+  test "$2" = "$(sed -n 's/^network:[^:]*:\([^:]*\):.*/\1/p' /etc/group)"
+  /usr/bin/vtysh -N meduza-smoke -d bgpd -c 'show running-config' > /tmp/frr-running-smoke.conf
+  grep -q 'router bgp 65001' /tmp/frr-running-smoke.conf
+  kill "$pid"
+  wait "$pid"
+  trap - EXIT
+  echo 'FRR daemon runs as network:network and reads its private configuration'
 fi
 if [ "$PACKAGE" = frr ]; then
   names=""
@@ -94,7 +119,8 @@ def main():
             parser.error(f"Missing native acceptance packages: {packages}")
         image = prepare_rootfs(config, target, fmt, repo / "out/acceptance-rootfs")
         print(f"Native {fmt} acceptance: {target['platform']} / {arch}", flush=True)
-        subprocess.run(["podman", "run", "--rm", "--network=none", "--platform", target["platform"],
+        subprocess.run(["podman", "run", "--rm", "--network=none", "--cap-add=NET_ADMIN", "--cap-add=NET_RAW",
+                        "--cap-add=NET_BIND_SERVICE", "--cap-add=SYS_ADMIN", "--platform", target["platform"],
                         "-v", f"{packages.resolve()}:/pkgs:ro,Z", "-e", f"PACKAGE={args.package}",
                         "-e", f"VERSION={version}", "-e", f"FORMAT={fmt}", "-e", f"ARCH={arch}",
                         "-e", f"BINARIES={' '.join(paths)}", image, "sh", "-euc", SCRIPT], check=True, timeout=600)

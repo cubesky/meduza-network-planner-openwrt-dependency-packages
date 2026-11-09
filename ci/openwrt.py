@@ -15,7 +15,7 @@ from common import sha256
 
 
 FRR_BINS = "babeld bfdd bgpd eigrpd fabricd isisd ldpd nhrpd ospfd ospf6d pathd pbrd pimd pim6d ripd ripngd staticd vrrpd watchfrr zebra mgmtd vtysh".split()
-FRR_USERS = "frr:frr"
+FRR_USERS = "network:network"
 
 
 def frr_postinst():
@@ -123,9 +123,10 @@ def package_files(tree, package, provenance, repo):
         common["etc/init.d/tinc"] = file(repo / "packaging/tinc.init", 0o755)
         return {"tinc": (common, system_depends)}
     add_tree(common, tree / "share", "usr/share/")
-    common["etc/frr/frr.conf"] = (b"frr defaults traditional\nservice integrated-vtysh-config\n", 0o644)
+    common["etc/frr/frr.conf"] = (b"frr defaults traditional\nservice integrated-vtysh-config\n", 0o600)
     common["etc/frr/daemons"] = (b"# Standalone service only; leave disabled when managed by Meduza NP.\nDAEMONS='mgmtd zebra staticd bgpd bfdd ospfd'\n", 0o644)
     common["etc/init.d/frr"] = file(repo / "packaging/frr.init", 0o755)
+    common["usr/libexec/frr-prepare"] = file(repo / "packaging/frr.prepare", 0o755)
     result = {"frr": (common, system_depends)}
     for name in FRR_BINS:
         path = "usr/bin/vtysh" if name == "vtysh" else f"usr/sbin/{name}"

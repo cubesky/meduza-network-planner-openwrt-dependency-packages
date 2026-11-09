@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+
+# Numeric IDs also work when this script runs against an offline image root.
+root="${IPKG_INSTROOT:-}"
+network_uid="$(sed -n 's/^network:[^:]*:\([^:]*\):.*/\1/p' "$root/etc/passwd")"
+network_gid="$(sed -n 's/^network:[^:]*:\([^:]*\):.*/\1/p' "$root/etc/group")"
+[ -n "$network_uid" ] && [ -n "$network_gid" ]
+
+mkdir -p "$root/etc/frr"
+chown "$network_uid:$network_gid" "$root/etc/frr"
+chmod 0750 "$root/etc/frr"
+for config in "$root/etc/frr/"*.conf "$root/etc/frr/daemons"; do
+    [ -f "$config" ] || continue
+    chown "$network_uid:$network_gid" "$config"
+done
+
+# /var is volatile on OpenWrt; prepare it again at each service start.
+if [ -z "$root" ]; then
+    mkdir -p /var/run/frr
+    chown "$network_uid:$network_gid" /var/run/frr
+    chmod 0755 /var/run/frr
+fi

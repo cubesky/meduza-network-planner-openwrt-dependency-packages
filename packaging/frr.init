@@ -5,7 +5,7 @@ start_service() {
     local daemon DAEMONS
     DAEMONS='mgmtd zebra staticd bgpd bfdd ospfd'
     [ ! -r /etc/frr/daemons ] || . /etc/frr/daemons
-    mkdir -p /var/run/frr
+    /usr/libexec/frr-prepare || return 1
     for daemon in $DAEMONS; do
         [ -x "/usr/sbin/$daemon" ] || continue
         procd_open_instance "$daemon"

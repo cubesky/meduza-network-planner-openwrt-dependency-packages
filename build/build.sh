@@ -92,7 +92,7 @@ else
     --with-clippy=/build/clippy/lib/clippy \
     --sysconfdir=/etc/frr --localstatedir=/var/run/frr \
     --enable-shared --enable-static --enable-static-bin --enable-vtysh \
-    --enable-user=root --enable-group=root --enable-vty-group=root \
+    --enable-user=network --enable-group=network \
     --disable-doc --disable-backtrace --disable-snmp --disable-rpki --disable-werror \
     --disable-sysrepo --disable-grpc --disable-zeromq --disable-fpm \
     LIBS="$frr_libs" || { cat config.log >&2; exit 1; }

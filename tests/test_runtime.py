@@ -112,6 +112,8 @@ class AcceptanceTests(unittest.TestCase):
             self.assertIn(f"{packages.resolve()}:/pkgs:ro,Z", command)
             self.assertIn("linux/arm64", command)
             self.assertIn("ARCH=aarch64_generic", command)
+            self.assertIn("--cap-add=NET_ADMIN", command)
+            self.assertIn("--cap-add=SYS_ADMIN", command)
             self.assertTrue(any(value.startswith("BINARIES=") and "/usr/bin/vtysh" in value and "/usr/sbin/babeld" in value for value in command))
 
 

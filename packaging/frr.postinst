@@ -10,5 +10,6 @@ export IPKG_INSTROOT
 root="$IPKG_INSTROOT"
 pkgname=frr
 add_group_and_user
-user_exists frr
-group_exists frr
+user_exists network
+group_exists network
+sh "$IPKG_INSTROOT/usr/libexec/frr-prepare"

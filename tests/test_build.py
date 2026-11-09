@@ -125,7 +125,7 @@ class PackagingTests(unittest.TestCase):
                     openwrt.write_ipk({}, name, "10.4.1-r2", "x86_64", [], output)
                     control = untar(untar(output.read_bytes())["./control.tar.gz"][0])
                     if name == "frr":
-                        self.assertIn(b"Require-User: frr:frr\n", control["./control"][0])
+                        self.assertIn(b"Require-User: network:network\n", control["./control"][0])
                         self.assertEqual(control["./postinst"][0], (ROOT / "packaging/frr.postinst").read_bytes())
                         self.assertEqual(control["./postinst"][1], 0o755)
                     else:
@@ -140,7 +140,7 @@ class PackagingTests(unittest.TestCase):
                     script = (stage / "mkpkg.sh").read_text()
                     users = stage / "root/lib/apk/packages/frr.rusers"
                     if name == "frr":
-                        self.assertEqual(users.read_text(), "frr:frr\n")
+                        self.assertEqual(users.read_text(), "network:network\n")
                         self.assertEqual((stage / "post-install").read_bytes(), (ROOT / "packaging/frr.postinst").read_bytes())
                         self.assertIn("--script post-install:post-install", script)
                         self.assertIn("--script post-upgrade:post-install", script)
@@ -207,6 +207,8 @@ class PackagingTests(unittest.TestCase):
             packages = openwrt.package_files(tree, "frr", {"static": False, "runtime": {"systemPackages": ["libc"]}}, ROOT)
             self.assertEqual(len(packages), 23)
             self.assertEqual(packages["frr"][1], ["libc"])
+            self.assertEqual(packages["frr"][0]["etc/frr/frr.conf"][1], 0o600)
+            self.assertEqual(packages["frr"][0]["usr/libexec/frr-prepare"][1], 0o755)
             for name in ("zebra", "bgpd", "bfdd", "ospfd", "mgmtd", "vtysh"):
                 self.assertIn("frr-" + name, packages)
             self.assertIn("usr/bin/vtysh", packages["frr-vtysh"][0])
