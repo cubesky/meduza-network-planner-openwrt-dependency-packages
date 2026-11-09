@@ -71,6 +71,8 @@ else
   cmake --build /build/yang-build -j "$jobs"
   cmake --install /build/yang-build
   cd /build/frr
+  # Backport upstream's mgmtd archive order before generating Makefile.in.
+  patch --batch --fuzz=0 -p1 < /recipe/patches/frr/0001-mgmtd-static-link-order.patch
   ./bootstrap.sh
   # clippy embeds Python and is only a code-generation tool. Build it dynamically
   # first; --enable-static-bin must apply to shipped daemons, not to host Python.

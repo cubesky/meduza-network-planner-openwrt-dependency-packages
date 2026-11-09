@@ -1,0 +1,9 @@
+# Fragment from FRR frr-10.4.1/mgmtd/subdir.am, lines 66-73.
+	yang/ietf/ietf-netconf-with-defaults.yang.c \
+	# nothing
+mgmtd_mgmtd_CFLAGS = $(AM_CFLAGS) -I ./
+mgmtd_mgmtd_LDADD = mgmtd/libmgmtd.a lib/libfrr.la $(LIBCAP) $(LIBM) $(LIBYANG_LIBS) $(UST_LIBS)
+mgmtd_mgmtd_LDADD += mgmtd/libmgmt_be_nb.la
+
+
+if STATICD

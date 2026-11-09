@@ -1,0 +1,23 @@
+Subject: [PATCH] mgmtd: link management CLI archive before libfrr
+
+libmgmt_be_nb contains RIP/RIPng CLI callbacks referencing if_rmap and
+distribute functions in libfrr. With static archives, placing libfrr first
+leaves these references unresolved because GNU ld has already scanned it.
+
+Use the dependency order present in upstream mgmtd/subdir.am. Keep all
+protocol daemons enabled and retain the pinned FRR 10.4.1 sources.
+
+Upstream-Status: Backport [https://github.com/FRRouting/frr/blob/master/mgmtd/subdir.am]
+
+--- a/mgmtd/subdir.am
++++ b/mgmtd/subdir.am
+@@ -66,8 +66,7 @@
+ 	yang/ietf/ietf-netconf-with-defaults.yang.c \
+ 	# nothing
+ mgmtd_mgmtd_CFLAGS = $(AM_CFLAGS) -I ./
+-mgmtd_mgmtd_LDADD = mgmtd/libmgmtd.a lib/libfrr.la $(LIBCAP) $(LIBM) $(LIBYANG_LIBS) $(UST_LIBS)
+-mgmtd_mgmtd_LDADD += mgmtd/libmgmt_be_nb.la
++mgmtd_mgmtd_LDADD = mgmtd/libmgmtd.a mgmtd/libmgmt_be_nb.la lib/libfrr.la $(LIBCAP) $(LIBM) $(LIBYANG_LIBS) $(UST_LIBS)
+ 
+ 
+ if STATICD

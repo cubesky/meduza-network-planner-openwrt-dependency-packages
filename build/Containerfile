@@ -11,6 +11,7 @@ RUN apk add --no-cache build-base linux-headers perl autoconf automake libtool p
 COPY ci/sources.lock.json /recipe/lock.json
 COPY downloads/ /archives/
 COPY build/build.sh /recipe/build.sh
+COPY build/patches/ /recipe/patches/
 RUN PACKAGE="$PACKAGE" TARGETPLATFORM="$TARGETPLATFORM" BUILD_JOBS="$BUILD_JOBS" \
     sh /recipe/build.sh /recipe/lock.json /out
 
