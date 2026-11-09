@@ -6,5 +6,6 @@
 *.sh text eol=lf
 *.patch text eol=lf whitespace=-blank-at-eol,-space-before-tab
 *.init text eol=lf
+*.postinst text eol=lf
 *.config text eol=lf
 Containerfile text eol=lf

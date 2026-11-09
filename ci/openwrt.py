@@ -15,6 +15,11 @@ from common import sha256
 
 
 FRR_BINS = "babeld bfdd bgpd eigrpd fabricd isisd ldpd nhrpd ospfd ospf6d pathd pbrd pimd pim6d ripd ripngd staticd vrrpd watchfrr zebra mgmtd vtysh".split()
+FRR_USERS = "frr:frr"
+
+
+def frr_postinst():
+    return (Path(__file__).resolve().parents[1] / "packaging/frr.postinst").read_bytes()
 
 
 def tar_gz(files, directories=True):
@@ -40,6 +45,8 @@ def tar_gz(files, directories=True):
 
 def control_text(name, version, arch, files, depends):
     text = f"Package: {name}\nVersion: {version}\n"
+    if name == "frr":
+        text += f"Require-User: {FRR_USERS}\n"
     if depends:
         text += "Depends: " + ", ".join(f"{dep} (= {version})" if dep == "frr" else dep for dep in depends) + "\n"
     return text + (f"License: GPL-2.0-or-later\nSection: net\nArchitecture: {arch}\n"
@@ -49,6 +56,8 @@ def control_text(name, version, arch, files, depends):
 
 def write_ipk(files, name, version, arch, depends, output):
     control = {"control": (control_text(name, version, arch, files, depends).encode(), 0o644)}
+    if name == "frr":
+        control["postinst"] = (frr_postinst(), 0o755)
     configs = ["/" + path for path in files if path.startswith("etc/") and not path.startswith("etc/init.d/")]
     if configs:
         control["conffiles"] = (("\n".join(configs) + "\n").encode(), 0o644)
@@ -73,6 +82,13 @@ def write_apk_stage(files, name, version, arch, depends, output):
     command = "#!/bin/sh\nset -eu\nfind root -exec touch -h -d @0 {} +\nexec apk mkpkg"
     command += "".join(" \\\n  --info " + shlex.quote(value) for value in info)
     command += " \\\n  --files root --output " + shlex.quote("../" + output.name) + "\n"
+    if name == "frr":
+        users = root / "lib/apk/packages/frr.rusers"
+        users.parent.mkdir(parents=True, exist_ok=True)
+        users.write_text(FRR_USERS + "\n", newline="\n")
+        (stage / "post-install").write_bytes(frr_postinst())
+        (stage / "post-install").chmod(0o755)
+        command = command.rstrip("\n") + " --script post-install:post-install --script post-upgrade:post-install\n"
     (stage / "mkpkg.sh").write_text(command)
     (stage / "stage.json").write_text(json.dumps({"package": name, "version": version, "file": output.name,
                                                  "platform": "openwrt/" + arch, "format": "apk"}) + "\n")

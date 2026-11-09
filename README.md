@@ -30,6 +30,16 @@ tinc 和 FRR 分开编译，为 [meduza-network-planner-v2](https://github.com/c
 
 手动运行 **Actions → Build tinc and FRR packages → Run workflow**，可选择 `package`、`format`、`architectures`，例如 `aarch64_generic` 或 `x64,arm64,arm-v7`。手动运行从 Artifacts 下载，不修改 Release。手动入口需要工作流已进入默认分支。
 
+`build_mode` 控制是否重新编译：
+
+- `auto`（默认，也用于 TAG）：编译指纹一致时复用已通过 OpenWrt 验收的二进制，只重新生成原生包并验收；找不到匹配产物时才编译。
+- `repackage`：严格只重新打包。匹配产物缺失或校验失败时退出，绝不退回源码编译。
+- `rebuild`：忽略已有产物，强制重新编译。
+
+指纹按软件和 musl 平台分别计算，包含所用源码及校验值、构建镜像、编译脚本、Containerfile、ELF 检查规则和该软件补丁。修改 `packaging/`、`ci/openwrt.py`、原生包修订号（例如 FRR `r1` → `r2`）、输出架构标签或文档不会触发重新编译。打包仍使用当前代码、安装脚本和版本，并记录二进制原始构建提交及本次打包提交。
+
+二进制以 `compiled-*` Actions Artifacts 保存 90 天，SHA256 清单与编译指纹会在复用时校验；仅在 OpenWrt 安装、运行和卸载验收通过后保存。它们通过仓库 Artifacts API 跨运行读取，支持后续 TAG 复用；普通依赖缓存受分支/TAG 范围限制，参见 [GitHub 缓存访问规则](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#restrictions-for-accessing-a-cache)。首次采用该流程、产物过期/被删除或编译输入发生变化时，需要运行 `auto` 或 `rebuild` 建立匹配产物。工作流摘要会显示每个平台实际执行了复用还是编译。
+
 ## tinc / FRR 分包和验证
 
 tinc 包提供 `/usr/sbin/tinc`、`/usr/sbin/tincd`。FRR 分为主包 `frr` 与 22 个二进制子包，包括 `frr-zebra`、`frr-mgmtd`、`frr-vtysh`、`frr-bgpd`、`frr-bfdd`、`frr-ospfd` 等；子包依赖相同版本的主包。所有进程由 Meduza NP 管理，附带的独立 procd 服务默认不启用。

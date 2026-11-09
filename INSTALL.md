@@ -40,6 +40,18 @@ apk add --allow-untrusted ./frr_*_aarch64_generic.apk ./frr-zebra_*_aarch64_gene
 
 按需安装其他 `frr-*` 协议包。所有守护进程位于 `/usr/sbin`，`vtysh` 位于 `/usr/bin`，符合主项目的系统二进制探测和同目录守护进程查找方式。软件包中的 `build-info.json` 记录每个程序的解释器、共享库依赖、静态链接状态、源码摘要、构建镜像和同步的主项目提交。
 
+从 `10.4.1-r2` 起，FRR 主包在安装和升级时自动创建 `frr` 用户、组，供 Meduza NP 对运行目录和生成配置执行 `chown frr:frr`。已有账号及其 UID/GID 保持不变，卸载时保留账号。主包及所用 `frr-*` 子包应一并升级。
+
+已安装旧包且出现 `chown: unknown user/group frr:frr` 时，可先在 OpenWrt 的 root shell 中修复账号，再重新应用 Meduza NP 配置：
+
+```sh
+. /lib/functions.sh
+frr_gid="$(group_add_next frr)"
+user_exists frr || user_add frr "" "$frr_gid"
+group_add_user frr frr
+id frr
+```
+
 ## 由 Meduza NP 管理
 
 安装系统二进制后运行 `meduza-np doctor` 检查，并由主项目下发配置、启动和监督进程。附带的 `/etc/init.d/tinc` 与 `/etc/init.d/frr` 默认不启用，供独立使用时手动配置；由 Meduza NP 管理的节点应保持这些独立服务停止，避免两个控制器管理同一服务。

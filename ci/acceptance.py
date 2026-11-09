@@ -21,6 +21,13 @@ case "$FORMAT" in
   apk) apk add --allow-untrusted --no-network --force-non-repository "$base"
        if [ "$PACKAGE" = frr ]; then apk add --allow-untrusted --no-network --force-non-repository /pkgs/frr-*_${VERSION}_${ARCH}.apk; fi ;;
 esac
+if [ "$PACKAGE" = frr ]; then
+  # Meduza's FRR plan chowns both its pathspace and generated configuration.
+  id frr
+  mkdir -p /var/run/frr/meduza-smoke /tmp/frr-generation-smoke
+  chown frr:frr /var/run/frr/meduza-smoke
+  chown -R frr:frr /tmp/frr-generation-smoke
+fi
 for bin in $BINARIES; do
   case "$bin" in */vtysh) "$bin" --help ;; *) "$bin" --version ;; esac
 done

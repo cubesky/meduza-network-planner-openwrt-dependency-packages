@@ -117,6 +117,37 @@ def untar(data):
 
 
 class PackagingTests(unittest.TestCase):
+    def test_frr_ipk_declares_accounts_and_installs_an_executable_postinst(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            for name in ("frr", "frr-bgpd", "tinc"):
+                with self.subTest(package=name):
+                    output = Path(temporary) / f"{name}.ipk"
+                    openwrt.write_ipk({}, name, "10.4.1-r2", "x86_64", [], output)
+                    control = untar(untar(output.read_bytes())["./control.tar.gz"][0])
+                    if name == "frr":
+                        self.assertIn(b"Require-User: frr:frr\n", control["./control"][0])
+                        self.assertEqual(control["./postinst"][0], (ROOT / "packaging/frr.postinst").read_bytes())
+                        self.assertEqual(control["./postinst"][1], 0o755)
+                    else:
+                        self.assertNotIn(b"Require-User:", control["./control"][0])
+                        self.assertNotIn("./postinst", control)
+
+    def test_frr_apk_creates_accounts_on_both_install_and_upgrade(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            for name in ("frr", "frr-bgpd", "tinc"):
+                with self.subTest(package=name):
+                    stage = openwrt.write_apk_stage({}, name, "10.4.1-r2", "aarch64_generic", [], Path(temporary) / f"{name}.apk")
+                    script = (stage / "mkpkg.sh").read_text()
+                    users = stage / "root/lib/apk/packages/frr.rusers"
+                    if name == "frr":
+                        self.assertEqual(users.read_text(), "frr:frr\n")
+                        self.assertEqual((stage / "post-install").read_bytes(), (ROOT / "packaging/frr.postinst").read_bytes())
+                        self.assertIn("--script post-install:post-install", script)
+                        self.assertIn("--script post-upgrade:post-install", script)
+                    else:
+                        self.assertFalse(users.exists())
+                        self.assertNotIn("--script", script)
+
     def test_ipk_matches_upstream_outer_layout_and_preserves_config_and_modes(self):
         files = {"usr/sbin/tincd": (b"static ELF fixture", 0o755), "etc/config/tinc": (b"config tinc", 0o644)}
         with tempfile.TemporaryDirectory() as temporary:

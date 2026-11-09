@@ -1,5 +1,5 @@
 {
-  "packages": {"tinc": {"version": "1.1_pre18-r1", "sources": ["tinc", "lzo"]}, "frr": {"version": "10.4.1-r1", "sources": ["frr", "libyang", "json-c", "c-ares", "protobuf-c"]}},
+  "packages": {"tinc": {"version": "1.1_pre18-r1", "sources": ["tinc", "lzo"]}, "frr": {"version": "10.4.1-r2", "sources": ["frr", "libyang", "json-c", "c-ares", "protobuf-c"]}},
   "sources": [
     {"name": "tinc", "version": "1.1pre18", "url": "https://tinc-vpn.org/packages/tinc-1.1pre18.tar.gz", "sha256": "2757ddc62cf64b411f569db2fa85c25ec846c0db110023f6befb33691f078986", "license": "GPL-2.0-or-later", "license_file": "COPYING"},
     {"name": "lzo", "version": "2.10", "url": "https://sources.openwrt.org/lzo-2.10.tar.gz", "sha256": "c0f892943208266f9b6543b3ae308fab6284c5c90e627931446fb49b4221a072", "license": "GPL-2.0-or-later", "license_file": "COPYING"},

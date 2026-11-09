@@ -7,7 +7,8 @@ from pathlib import Path
 import shutil
 import subprocess
 
-from common import download, sha256
+from common import sha256
+from binaries import prepare_binaries
 from elf import inspect_binary
 from openwrt import FRR_BINS, descriptor, package_files, write_apk_stage, write_ipk
 
@@ -57,6 +58,7 @@ def main():
     parser.add_argument("--target", required=True)
     parser.add_argument("--arches", required=True)
     parser.add_argument("--formats", default="ipk,apk")
+    parser.add_argument("--reuse-binaries", action="store_true", help="Require an exact, verified compiled artifact; never compile")
     args = parser.parse_args()
     repo = Path.cwd()
     config = json.loads((repo / "ci/targets.json").read_text())
@@ -66,27 +68,16 @@ def main():
     if target is None or not set(arches) <= set(target["arches"]) or not set(formats) <= set(config["formats"]):
         parser.error("Unsupported target/architecture/format combination")
     sources = [row for row in lock["sources"] if row["name"] in lock["packages"][args.package]["sources"]]
-    downloads = repo / "downloads"
-    downloads.mkdir(exist_ok=True)
-    for source in sources:
-        cached = downloads / f"{source['name']}.tar.gz"
-        if not cached.exists() or sha256(cached) != source["sha256"]:
-            download(source["url"], cached, source["sha256"])
     # One isolated native-musl build per platform, emulated by QEMU for ARM.
     tree = repo / "out" / args.package / target["platform"].replace("/", "-")
-    tree.parent.mkdir(parents=True, exist_ok=True)
-    if tree.exists():
-        raise ValueError(f"Refusing to reuse an existing build output: {tree}")
-    run("podman", "build", "--platform", target["platform"], "-f", "build/Containerfile",
-        "--build-arg", f"BUILDER_IMAGE={config['builder_image']}", "--build-arg", f"PACKAGE={args.package}",
-        "--build-arg", f"TARGETPLATFORM={target['platform']}", "--build-arg", "BUILD_JOBS=2",
-        "--output", f"type=local,dest={tree}", ".")
+    compiled = prepare_binaries(repo, config, lock, args.package, target, tree, args.reuse_binaries)
     runtime = check_binaries(tree, target, args.package)
     system_packages = sorted({dep for binary in runtime.values() for dep in binary["systemPackages"]})
     provenance = {"buildInfoVersion": 1, "package": args.package, "target": args.target, "platform": target["platform"],
                   "static": all(binary["static"] for binary in runtime.values()),
                   "runtime": {"binaries": runtime, "systemPackages": system_packages},
                   "builder": config["builder_image"], "sources": sources,
+                  "binaryBuild": {"fingerprint": compiled["fingerprint"], "commit": compiled["commit"], "reused": args.reuse_binaries},
                   "upstream": config["upstream"], "commit": os.getenv("GITHUB_SHA", "local"),
                   "binaries": {path.name: sha256(path) for path in sorted((tree / "bin").iterdir())}}
     packages = package_files(tree, args.package, provenance, repo)

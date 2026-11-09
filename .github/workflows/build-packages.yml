@@ -19,9 +19,15 @@ on:
         description: 'all, a specific OpenWrt architecture, or platform aliases: linux-amd64,arm64,arm-v7'
         type: string
         default: all
+      build_mode:
+        description: 'auto: reuse matching binaries; repackage: never compile; rebuild: force compilation'
+        type: choice
+        default: auto
+        options: [auto, repackage, rebuild]
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: packages-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
@@ -65,11 +71,29 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Find verified binaries with matching compilation inputs
+        id: compiled
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE: ${{ matrix.package }}
+          TARGET: ${{ matrix.target }}
+          BUILD_MODE: ${{ inputs.build_mode || 'auto' }}
+        run: python3 ci/binaries.py --package "$PACKAGE" --target "$TARGET" --mode "$BUILD_MODE"
+      - name: Restore compiled binaries from a previous run
+        if: steps.compiled.outputs.hit == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ steps.compiled.outputs.artifact_id }}
+          run-id: ${{ steps.compiled.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ steps.compiled.outputs.path }}
+          merge-multiple: true
       - name: Install the same provider-build tools as the main project
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends podman qemu-user-static binutils
       - name: Restore verified source archives
+        if: steps.compiled.outputs.hit != 'true'
         uses: actions/cache@v4
         with:
           path: downloads
@@ -80,10 +104,13 @@ jobs:
           TARGET: ${{ matrix.target }}
           ARCHES: ${{ matrix.arches }}
           FORMATS: ${{ matrix.formats }}
+          REUSE_BINARIES: ${{ steps.compiled.outputs.hit }}
         run: |
           set -o pipefail
+          reuse=()
+          if [ "$REUSE_BINARIES" = true ]; then reuse+=(--reuse-binaries); fi
           python3 -u ci/build.py --package "$PACKAGE" --target "$TARGET" \
-            --arches "$ARCHES" --formats "$FORMATS" 2>&1 | tee build.log
+            --arches "$ARCHES" --formats "$FORMATS" "${reuse[@]}" 2>&1 | tee build.log
       - name: Install, run and remove packages in real OpenWrt userspace
         env:
           PACKAGE: ${{ matrix.package }}
@@ -94,6 +121,23 @@ jobs:
           set -o pipefail
           python3 -u ci/acceptance.py --package "$PACKAGE" --target "$TARGET" \
             --arches "$ARCHES" --formats "$FORMATS" 2>&1 | tee -a build.log
+      - name: Save newly compiled binaries after OpenWrt acceptance passes
+        if: steps.compiled.outputs.hit != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.compiled.outputs.name }}
+          path: |
+            ${{ steps.compiled.outputs.path }}/bin/
+            ${{ steps.compiled.outputs.path }}/licenses/
+            ${{ steps.compiled.outputs.path }}/share/
+            ${{ steps.compiled.outputs.path }}/runtime.json
+            ${{ steps.compiled.outputs.path }}/sources.lock.json
+            ${{ steps.compiled.outputs.path }}/compiled-build.json
+          include-hidden-files: true
+          if-no-files-found: error
+          compression-level: 1
+          retention-days: 90
+          overwrite: true
       - name: Upload native package files and matching artifact descriptors
         uses: actions/upload-artifact@v4
         with:

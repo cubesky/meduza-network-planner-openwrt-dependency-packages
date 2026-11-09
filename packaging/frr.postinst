@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+[ "${IPKG_NO_SCRIPT:-0}" != 1 ] || exit 0
+# Use OpenWrt's account allocator for live installs and offline image roots.
+# This preserves existing users/groups and avoids claiming a fixed UID/GID.
+IPKG_INSTROOT="${IPKG_INSTROOT:-}"
+export IPKG_INSTROOT
+. "$IPKG_INSTROOT/lib/functions.sh"
+root="$IPKG_INSTROOT"
+pkgname=frr
+add_group_and_user
+user_exists frr
+group_exists frr
